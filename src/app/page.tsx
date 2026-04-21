@@ -1,65 +1,97 @@
-import Image from "next/image";
+import { getServerSession } from "next-auth";
+import { authOptions } from "./api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { PrismaClient } from "@prisma/client";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+const prisma = new PrismaClient();
+
+export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  const user = session.user;
+
+  // Staff Dashboard
+  if (user.role === "staff") {
+    const assignedPersons = await prisma.person.findMany({
+      where: { assignedStaffId: user.id, isActive: true },
+      orderBy: { fullName: "asc" }
+    });
+
+    const membersCount = assignedPersons.filter(p => p.personType === 'member').length;
+    const visitsCount = assignedPersons.filter(p => p.personType === 'visit').length;
+
+    return (
+      <div className="flex flex-col gap-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+          <h2>My Assigned People</h2>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="flex gap-4">
+          <div className="card flex-1 flex flex-col items-center justify-center py-6">
+            <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>{membersCount}</span>
+            <span style={{ color: 'var(--secondary)' }}>Members</span>
+          </div>
+          <div className="card flex-1 flex flex-col items-center justify-center py-6">
+            <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--warning)' }}>{visitsCount}</span>
+            <span style={{ color: 'var(--secondary)' }}>Visits</span>
+          </div>
         </div>
-      </main>
-    </div>
-  );
+
+        <div className="card">
+          <h3 className="mb-4">People List</h3>
+          {assignedPersons.length === 0 ? (
+            <p style={{ color: 'var(--secondary)' }}>No people assigned to you yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-2" style={{ listStyle: 'none' }}>
+              {assignedPersons.map((person) => (
+                <li key={person.id} className="flex justify-between items-center p-3" style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                  <div className="flex items-center gap-3">
+                    <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--unknown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--secondary)' }}>
+                      {person.fullName.charAt(0)}
+                    </div>
+                    <span style={{ fontWeight: 500 }}>{person.fullName}</span>
+                  </div>
+                  <span className={`badge badge-${person.personType}`}>{person.personType}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Elder Dashboard
+  if (user.role === "elder") {
+    const allStaff = await prisma.user.findMany({
+      where: { role: 'staff', isActive: true },
+      include: {
+        _count: { select: { assignedPersons: true } }
+      }
+    });
+
+    return (
+      <div className="flex flex-col gap-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+          <h2>Elder Overview</h2>
+        </div>
+
+        <div className="card">
+          <h3 className="mb-4">Staff Directory</h3>
+          <ul className="flex flex-col gap-2" style={{ listStyle: 'none' }}>
+            {allStaff.map(staff => (
+              <li key={staff.id} className="flex justify-between items-center p-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontWeight: 500 }}>{staff.fullName}</span>
+                <span className="badge badge-unknown">{staff._count.assignedPersons} assigned</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 }

@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  fullName         String
+  username         String   @unique
+  passwordHash     String
+  role             String   // "staff" or "elder"
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  assignedPersons  Person[] @relation("AssignedStaff")
+  attendanceDrafts AttendanceDraft[]
+  attendanceRecordsEntered AttendanceRecord[] @relation("EnteredBy")
+  attendanceRecordsUpdated AttendanceRecord[] @relation("UpdatedBy")
+  changeRequestsMade ChangeRequest[] @relation("RequestedBy")
+  changeRequestsReviewed ChangeRequest[] @relation("ReviewedBy")
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+}
+
+model Person {
+  id               String   @id @default(cuid())
+  fullName         String
+  personType       String   // "member" or "visit"
+  photoUrl         String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  assignedStaffId  String?
+  assignedStaff    User?    @relation("AssignedStaff", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+
+  attendanceRecords AttendanceRecord[]
+  changeRequests    ChangeRequest[]
+}
+
+model AttendanceRecord {
+  id               String   @id @default(cuid())
+  sundayDate       DateTime
+  status           String   // "present", "absent", "unknown"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  personId         String
+  person           Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  enteredByUserId  String
+  enteredBy        User     @relation("EnteredBy", fields: [enteredByUserId], references: [id])
+
+  updatedByUserId  String?
+  updatedBy        User?    @relation("UpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@unique([personId, sundayDate])
+}
+
+model AttendanceDraft {
+  id               String   @id @default(cuid())
+  sundayDate       DateTime
+  draftJson        String   // Stored as JSON string to support "present", "absent", "unknown" or blank
+  updatedAt        DateTime @updatedAt
+
+  staffId          String
+  staff            User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, sundayDate])
+}
+
+model ChangeRequest {
+  id               String   @id @default(cuid())
+  actionType       String   // "add_person", "edit_person", "delete_person", "change_type"
+  payloadJson      String   // Contains proposed data
+  status           String   @default("pending") // "pending", "approved", "rejected"
+  reviewNote       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  requestedByUserId String
+  requestedBy      User     @relation("RequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+  targetPersonId   String?
+  targetPerson     Person?  @relation(fields: [targetPersonId], references: [id], onDelete: SetNull)
+
+  reviewedByUserId String?
+  reviewedBy       User?    @relation("ReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id               String   @id @default(cuid())
+  type             String   // "request_submitted", "request_approved", "request_rejected", "system"
+  title            String
+  body             String
+  relatedEntityType String? // e.g., "ChangeRequest"
+  relatedEntityId  String?
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  recipientUserId  String
+  recipient        User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id               String   @id @default(cuid())
+  entityType       String
+  entityId         String
+  action           String   // "create", "update", "delete"
+  beforeJson       String?
+  afterJson        String?
+  createdAt        DateTime @default(now())
+
+  actorUserId      String
+  actor            User     @relation(fields: [actorUserId], references: [id])
+}
