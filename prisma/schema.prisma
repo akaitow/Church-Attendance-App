@@ -10,15 +10,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Church {
+  id               String   @id @default(cuid())
+  name             String
+  staffLimit       Int      @default(10)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users            User[]
+  persons          Person[]
+  attendanceRecords AttendanceRecord[]
+  attendanceDrafts AttendanceDraft[]
+  changeRequests   ChangeRequest[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+}
+
 model User {
   id               String   @id @default(cuid())
   fullName         String
   username         String   @unique
   passwordHash     String
-  role             String   // "staff" or "elder"
+  role             String   // "admin", "staff" or "elder"
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
 
   assignedPersons  Person[] @relation("AssignedStaff")
   attendanceDrafts AttendanceDraft[]
@@ -39,6 +58,9 @@ model Person {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
   assignedStaffId  String?
   assignedStaff    User?    @relation("AssignedStaff", fields: [assignedStaffId], references: [id], onDelete: SetNull)
 
@@ -52,6 +74,9 @@ model AttendanceRecord {
   status           String   // "present", "absent", "unknown"
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
 
   personId         String
   person           Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
@@ -71,6 +96,9 @@ model AttendanceDraft {
   draftJson        String   // Stored as JSON string to support "present", "absent", "unknown" or blank
   updatedAt        DateTime @updatedAt
 
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
   staffId          String
   staff            User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
@@ -86,6 +114,9 @@ model ChangeRequest {
   reviewedAt       DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
 
   requestedByUserId String
   requestedBy      User     @relation("RequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
@@ -107,6 +138,9 @@ model Notification {
   isRead           Boolean  @default(false)
   createdAt        DateTime @default(now())
 
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
   recipientUserId  String
   recipient        User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
 }
@@ -119,6 +153,9 @@ model AuditLog {
   beforeJson       String?
   afterJson        String?
   createdAt        DateTime @default(now())
+
+  churchId         String
+  church           Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
 
   actorUserId      String
   actor            User     @relation(fields: [actorUserId], references: [id])

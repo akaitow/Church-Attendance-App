@@ -47,6 +47,9 @@ export default async function RootLayout({
                   {session.user.role === 'elder' && (
                     <li><Link href="/reports" className="btn btn-secondary w-full" style={{ justifyContent: 'flex-start' }}>Reports</Link></li>
                   )}
+                  {session.user.role === 'admin' && (
+                    <li><Link href="/settings/staff" className="btn btn-secondary w-full" style={{ justifyContent: 'flex-start' }}>Manage Staff</Link></li>
+                  )}
                   <li><Link href="/settings" className="btn btn-secondary w-full" style={{ justifyContent: 'flex-start' }}>Settings</Link></li>
                   <li><Link href="/notifications" className="btn btn-secondary w-full" style={{ justifyContent: 'flex-start' }}>Notifications</Link></li>
                 </ul>

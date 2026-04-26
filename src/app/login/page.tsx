@@ -69,6 +69,13 @@ export default function LoginPage() {
             Sign In
           </button>
         </form>
+
+        <div className="mt-6 text-center" style={{ fontSize: '0.875rem' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Don't have an account? </span>
+          <a href="/signup" style={{ color: 'var(--primary)', fontWeight: 500, textDecoration: 'none' }}>
+            Register your church
+          </a>
+        </div>
       </div>
     </div>
   );

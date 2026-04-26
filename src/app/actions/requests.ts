@@ -11,6 +11,7 @@ export async function submitChangeRequest(actionType: string, payload: any, targ
   if (!session || session.user.role !== "staff") throw new Error("Unauthorized");
 
   const userId = session.user.id;
+  const churchId = session.user.churchId;
 
   const request = await prisma.changeRequest.create({
     data: {
@@ -18,12 +19,13 @@ export async function submitChangeRequest(actionType: string, payload: any, targ
       payloadJson: JSON.stringify(payload),
       status: "pending",
       requestedByUserId: userId,
-      targetPersonId
+      targetPersonId,
+      churchId
     }
   });
 
   // Notify elders
-  const elders = await prisma.user.findMany({ where: { role: "elder" } });
+  const elders = await prisma.user.findMany({ where: { role: "elder", churchId } });
   await prisma.notification.createMany({
     data: elders.map(elder => ({
       type: "request_submitted",
@@ -31,7 +33,8 @@ export async function submitChangeRequest(actionType: string, payload: any, targ
       body: `${session.user.name} submitted a request to ${actionType.replace('_', ' ')}.`,
       recipientUserId: elder.id,
       relatedEntityType: "ChangeRequest",
-      relatedEntityId: request.id
+      relatedEntityId: request.id,
+      churchId
     }))
   });
 
@@ -40,11 +43,12 @@ export async function submitChangeRequest(actionType: string, payload: any, targ
 
 export async function processChangeRequest(requestId: string, approve: boolean, reviewNote?: string) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "elder") throw new Error("Unauthorized");
+  if (!session || (session.user.role !== "elder" && session.user.role !== "admin")) throw new Error("Unauthorized");
 
   const elderId = session.user.id;
+  const churchId = session.user.churchId;
 
-  const request = await prisma.changeRequest.findUnique({ where: { id: requestId }, include: { requestedBy: true } });
+  const request = await prisma.changeRequest.findUnique({ where: { id: requestId, churchId }, include: { requestedBy: true } });
   if (!request) throw new Error("Not found");
 
   const status = approve ? "approved" : "rejected";
@@ -64,7 +68,8 @@ export async function processChangeRequest(requestId: string, approve: boolean, 
           data: {
             fullName: payload.fullName,
             personType: payload.personType,
-            assignedStaffId: request.requestedByUserId
+            assignedStaffId: request.requestedByUserId,
+            churchId
           }
         });
       } else if (request.actionType === "edit_person" && request.targetPersonId) {
@@ -94,7 +99,8 @@ export async function processChangeRequest(requestId: string, approve: boolean, 
         body: `Your request to ${request.actionType.replace('_', ' ')} was ${status}.`,
         recipientUserId: request.requestedByUserId,
         relatedEntityType: "ChangeRequest",
-        relatedEntityId: request.id
+        relatedEntityId: request.id,
+        churchId
       }
     });
   });
@@ -104,10 +110,12 @@ export async function processChangeRequest(requestId: string, approve: boolean, 
 
 export async function getPendingRequests() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "elder") throw new Error("Unauthorized");
+  if (!session || (session.user.role !== "elder" && session.user.role !== "admin")) throw new Error("Unauthorized");
+
+  const churchId = session.user.churchId;
 
   return prisma.changeRequest.findMany({
-    where: { status: "pending" },
+    where: { status: "pending", churchId },
     include: { requestedBy: true, targetPerson: true },
     orderBy: { createdAt: "desc" }
   });

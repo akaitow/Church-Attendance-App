@@ -9,14 +9,15 @@ const prisma = new PrismaClient({});
 
 export async function getLastSundayData() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "elder") throw new Error("Unauthorized");
+  if (!session || (session.user.role !== "elder" && session.user.role !== "admin")) throw new Error("Unauthorized");
 
+  const churchId = session.user.churchId;
   const sundays = getAvailableSundays();
   const lastSundayStr = sundays[0].date;
   const lastSundayDate = new Date(lastSundayStr);
 
   const records = await prisma.attendanceRecord.findMany({
-    where: { sundayDate: lastSundayDate },
+    where: { sundayDate: lastSundayDate, churchId },
     include: { person: true }
   });
 
@@ -25,9 +26,10 @@ export async function getLastSundayData() {
 
 export async function correctAttendance(recordId: string, newStatus: string) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "elder") throw new Error("Unauthorized");
+  if (!session || (session.user.role !== "elder" && session.user.role !== "admin")) throw new Error("Unauthorized");
 
   const userId = session.user.id;
+  const churchId = session.user.churchId;
 
   const record = await prisma.attendanceRecord.update({
     where: { id: recordId },
@@ -43,6 +45,7 @@ export async function correctAttendance(recordId: string, newStatus: string) {
       entityId: recordId,
       action: `correction_to_${newStatus}`,
       actorUserId: userId,
+      churchId,
     }
   });
 
@@ -51,7 +54,9 @@ export async function correctAttendance(recordId: string, newStatus: string) {
 
 export async function getGeneralReportData() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "elder") throw new Error("Unauthorized");
+  if (!session || (session.user.role !== "elder" && session.user.role !== "admin")) throw new Error("Unauthorized");
+
+  const churchId = session.user.churchId;
 
   // Get last 4 Sundays for trend chart (simple MVP filter)
   const sundays = getAvailableSundays().map(s => s.date); // just current and previous for now, or we can compute more
@@ -66,7 +71,7 @@ export async function getGeneralReportData() {
   }).reverse(); // chronological order
 
   const allRecords = await prisma.attendanceRecord.findMany({
-    where: { sundayDate: { in: recentSundays } },
+    where: { sundayDate: { in: recentSundays }, churchId },
     include: { person: true }
   });
 

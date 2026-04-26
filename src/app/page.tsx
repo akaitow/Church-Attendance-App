@@ -17,7 +17,7 @@ export default async function HomePage() {
   // Staff Dashboard
   if (user.role === "staff") {
     const assignedPersons = await prisma.person.findMany({
-      where: { assignedStaffId: user.id, isActive: true },
+      where: { assignedStaffId: user.id, isActive: true, churchId: user.churchId },
       orderBy: { fullName: "asc" }
     });
 
@@ -65,10 +65,10 @@ export default async function HomePage() {
     );
   }
 
-  // Elder Dashboard
-  if (user.role === "elder") {
+  // Elder / Admin Dashboard
+  if (user.role === "elder" || user.role === "admin") {
     const allStaff = await prisma.user.findMany({
-      where: { role: 'staff', isActive: true },
+      where: { role: 'staff', isActive: true, churchId: user.churchId },
       include: {
         _count: { select: { assignedPersons: true } }
       }
@@ -77,21 +77,32 @@ export default async function HomePage() {
     return (
       <div className="flex flex-col gap-6 animate-fade-in">
         <div className="flex justify-between items-center">
-          <h2>Elder Overview</h2>
+          <h2>{user.role === "admin" ? "Admin Overview" : "Elder Overview"}</h2>
+          {user.role === "admin" && (
+            <a href="/settings/staff" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+              Manage Staff
+            </a>
+          )}
         </div>
 
         <div className="card">
           <h3 className="mb-4">Staff Directory</h3>
-          <ul className="flex flex-col gap-2" style={{ listStyle: 'none' }}>
-            {allStaff.map(staff => (
-              <li key={staff.id} className="flex justify-between items-center p-3" style={{ borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontWeight: 500 }}>{staff.fullName}</span>
-                <span className="badge badge-unknown">{staff._count.assignedPersons} assigned</span>
-              </li>
-            ))}
-          </ul>
+          {allStaff.length === 0 ? (
+            <p style={{ color: 'var(--secondary)' }}>No staff members created yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-2" style={{ listStyle: 'none' }}>
+              {allStaff.map(staff => (
+                <li key={staff.id} className="flex justify-between items-center p-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontWeight: 500 }}>{staff.fullName}</span>
+                  <span className="badge badge-unknown">{staff._count.assignedPersons} assigned</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     );
   }
+
+  return <div>Unknown Role</div>;
 }

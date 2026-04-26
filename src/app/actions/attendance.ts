@@ -11,8 +11,9 @@ export async function getAssignedPeople() {
   if (!session) throw new Error("Unauthorized");
 
   const staffId = session.user.id;
+  const churchId = session.user.churchId;
   return prisma.person.findMany({
-    where: { assignedStaffId: staffId, isActive: true },
+    where: { assignedStaffId: staffId, isActive: true, churchId },
     orderBy: { fullName: "asc" },
   });
 }
@@ -22,6 +23,7 @@ export async function saveDraft(sundayDate: string, draftJson: string) {
   if (!session) throw new Error("Unauthorized");
 
   const staffId = session.user.id;
+  const churchId = session.user.churchId;
   const parsedDate = new Date(sundayDate);
 
   await prisma.attendanceDraft.upsert({
@@ -36,6 +38,7 @@ export async function saveDraft(sundayDate: string, draftJson: string) {
     },
     create: {
       staffId,
+      churchId,
       sundayDate: parsedDate,
       draftJson,
     },
@@ -48,6 +51,7 @@ export async function getDraft(sundayDate: string) {
   if (!session) return null;
 
   const staffId = session.user.id;
+  const churchId = session.user.churchId;
   const parsedDate = new Date(sundayDate);
 
   return prisma.attendanceDraft.findUnique({
@@ -65,12 +69,14 @@ export async function checkExistingAttendance(sundayDate: string) {
   if (!session) throw new Error("Unauthorized");
 
   const staffId = session.user.id;
+  const churchId = session.user.churchId;
   const parsedDate = new Date(sundayDate);
 
   // See if any attendance records exist for this staff's people on this Sunday
   const existingRecordsCount = await prisma.attendanceRecord.count({
     where: {
       sundayDate: parsedDate,
+      churchId,
       person: {
         assignedStaffId: staffId,
       },
@@ -85,6 +91,7 @@ export async function submitAttendance(sundayDate: string, statuses: Record<stri
   if (!session) throw new Error("Unauthorized");
 
   const userId = session.user.id;
+  const churchId = session.user.churchId;
   const parsedDate = new Date(sundayDate);
 
   // We are upserting records. For each personId in statuses, we insert/update.
@@ -114,6 +121,7 @@ export async function submitAttendance(sundayDate: string, statuses: Record<stri
         },
         create: {
           personId: record.personId,
+          churchId,
           sundayDate: parsedDate,
           status: record.status,
           enteredByUserId: userId,
@@ -129,6 +137,7 @@ export async function submitAttendance(sundayDate: string, statuses: Record<stri
       entityId: `${userId}-${sundayDate}`,
       action: "submit",
       actorUserId: userId,
+      churchId,
     },
   });
 

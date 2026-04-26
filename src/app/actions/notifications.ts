@@ -11,7 +11,7 @@ export async function getNotifications() {
   if (!session) throw new Error("Unauthorized");
 
   return prisma.notification.findMany({
-    where: { recipientUserId: session.user.id },
+    where: { recipientUserId: session.user.id, churchId: session.user.churchId },
     orderBy: { createdAt: "desc" },
     take: 50
   });
@@ -21,8 +21,8 @@ export async function markAsRead(notificationId: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  await prisma.notification.update({
-    where: { id: notificationId },
+  await prisma.notification.updateMany({
+    where: { id: notificationId, churchId: session.user.churchId },
     data: { isRead: true }
   });
 
@@ -34,7 +34,7 @@ export async function markAllAsRead() {
   if (!session) throw new Error("Unauthorized");
 
   await prisma.notification.updateMany({
-    where: { recipientUserId: session.user.id, isRead: false },
+    where: { recipientUserId: session.user.id, isRead: false, churchId: session.user.churchId },
     data: { isRead: true }
   });
 
